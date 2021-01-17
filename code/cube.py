@@ -70,7 +70,7 @@ class Cube(object):
                np.array([0., 0., -1.]), np.array([0, 0., 1.])]
     colordict = {"w":0, "y":1, "b":2, "g":3, "o":4, "r":5}
     pltpos = [(0., 1.05), (0., -1.05), (0., 0.), (2.10, 0.), (1.05, 0.), (-1.05, 0.)]
-    labelcolor = "#7f00ff"
+    labelcolor = "#000000"  # #7f00ff
 
     def __init__(self, N, whiteplastic=False):
         """
@@ -145,7 +145,7 @@ class Cube(object):
                 self.stickers[i] = np.rot90(self.stickers[i], 3)
             if l == self.N - 1:
                 self.stickers[i2] = np.rot90(self.stickers[i2], 1)
-        print "moved", f, l, len(ds)
+        print("moved", f, l, len(ds))
         return None
 
     def _rotate(self, args):
@@ -228,7 +228,7 @@ class Cube(object):
                         ax.add_artist(Polygon(xys, ec="none", fc=self.stickercolors[self.stickers[i, j, k]]))
                 x0, y0, zorder = self._render_points([1.5 * self.normals[i], ], viewpoint)[0]
                 ax.text(x0 + shift[0], y0 + shift[1], f, color=self.labelcolor,
-                        ha="center", va="center", rotation=20, fontsize=self.fontsize / (-zorder))
+                        ha="center", va="center", rotation=20, fontsize=self.fontsize / (-zorder), s="dat label")
         return None
 
     def _stickerpolygon(self, xdir, ydir, zdir, csz, j, k):
@@ -257,7 +257,7 @@ class Cube(object):
                     ax.add_artist(Rectangle((x0 + j * cs, y0 + k * cs), cs, cs, ec=self.plasticcolor,
                                             fc=self.stickercolors[self.stickers[i, j, k]]))
             ax.text(x0 + 0.5, y0 + 0.5, f, color=self.labelcolor,
-                    ha="center", va="center", rotation=20, fontsize=self.fontsize)
+                    ha="center", va="center", rotation=20, fontsize=self.fontsize, s="label")
         return None
 
     def render(self, flat=True, views=True):

@@ -8,6 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import widgets
 from projection import Quaternion, project_points
+# max
+from word_cube import WordCube
 
 """
 Sticker representation
@@ -46,11 +48,19 @@ canonical position.
 class Cube:
     """Magic Cube Representation"""
     # define some attribues
-    default_plastic_color = 'black'
+    default_plastic_color = 'black' # black
+    """
     default_face_colors = ["w", "#ffcf00",
                            "#00008f", "#009f0f",
                            "#ff6f00", "#cf0000",
                            "gray", "none"]
+    """
+
+    default_face_colors = ["w", "w",
+                           "w", "w",
+                           "w", "w",
+                           "w", "none"]
+
     base_face = np.array([[1, 1, 1],
                           [1, -1, 1],
                           [-1, -1, 1],
@@ -70,6 +80,8 @@ class Cube:
 
     base_face_centroid = np.array([[0, 0, 1]])
     base_sticker_centroid = np.array([[0, 0, 1 + stickerthickness]])
+    #max
+    base_text_centroid = np.array([[0, 0, 1 + 2*stickerthickness]])
 
     # Define rotation angles and axes for the six sides of the cube
     x, y, z = np.eye(3)
@@ -96,6 +108,8 @@ class Cube:
             self.face_colors = face_colors
 
         self._move_list = []
+        # max
+        self.wc = WordCube(shuffle=False)
         self._initialize_arrays()
 
     def _initialize_arrays(self):
@@ -114,7 +128,20 @@ class Cube:
         faces = []
         sticker_centroids = []
         stickers = []
+        # max
+        text_centroids = []
+
+        # tmp_letters = [letter.get_s() for letter in self.wc.config.flatten()]
+        tmp_inds = [letter.get_lid() for letter in self.wc.config.flatten()]
+        sort_idx = np.argsort(tmp_inds)
+        tmp_cfg = self.wc.config.flatten()[sort_idx]
+
+        self.text_letters = [letter.get_s()+str(letter.get_lid()) for letter in tmp_cfg]
+
         colors = []
+
+        # initialize directions for annotations here
+        # how to only show annotations if they are actually visible? zorder?
 
         factor = np.array([1. / self.N, 1. / self.N, 1])
 
@@ -128,6 +155,10 @@ class Cube:
                                       + translations, M.T)
             sticker_centroids_t = np.dot(self.base_sticker_centroid
                                          + translations, M.T)
+            #max
+            text_centroids_t = np.dot(self.base_text_centroid
+                                         + translations, M.T)
+
             colors_i = i + np.zeros(face_centroids_t.shape[0], dtype=int)
 
             # append face ID to the face centroids for lex-sorting
@@ -135,16 +166,23 @@ class Cube:
                                           colors_i[:, None]])
             sticker_centroids_t = sticker_centroids_t.reshape((-1, 3))
 
+            # max
+            text_centroids_t = text_centroids_t.reshape((-1,3))
+
             faces.append(faces_t)
             face_centroids.append(face_centroids_t)
             stickers.append(stickers_t)
             sticker_centroids.append(sticker_centroids_t)
+            # max
+            text_centroids.append(text_centroids_t)
             colors.append(colors_i)
 
         self._face_centroids = np.vstack(face_centroids)
         self._faces = np.vstack(faces)
         self._sticker_centroids = np.vstack(sticker_centroids)
         self._stickers = np.vstack(stickers)
+        # max
+        self._text_centroids = np.vstack(text_centroids)
         self._colors = np.concatenate(colors)
 
         self._sort_faces()
@@ -155,6 +193,8 @@ class Cube:
         self._face_centroids = self._face_centroids[ind]
         self._sticker_centroids = self._sticker_centroids[ind]
         self._stickers = self._stickers[ind]
+        # max
+        self._text_centroids = self._text_centroids[ind]
         self._colors = self._colors[ind]
         self._faces = self._faces[ind]
 
@@ -189,7 +229,7 @@ class Cube:
                 (proj < 1.1 - layer * cubie_width))
 
         for x in [self._stickers, self._sticker_centroids,
-                  self._faces]:
+                  self._faces, self._text_centroids]: #max self._text_centroids
             x[flag] = np.dot(x[flag], M.T)
         self._face_centroids[flag, :3] = np.dot(self._face_centroids[flag, :3],
                                                 M.T)
@@ -259,6 +299,7 @@ class InteractiveCube(plt.Axes):
         self._current_rot = self._start_rot  #current rotation state
         self._face_polys = None
         self._sticker_polys = None
+        self._text_annotations = None
 
         self._draw_cube()
 
@@ -283,6 +324,8 @@ class InteractiveCube(plt.Axes):
                          "(hold shift for counter-clockwise)",
                          size=10)
 
+        # self.annotate("TEST",  xy=(.5, .5))
+
     def _initialize_widgets(self):
         self._ax_reset = self.figure.add_axes([0.75, 0.05, 0.2, 0.075])
         self._btn_reset = widgets.Button(self._ax_reset, 'Reset View')
@@ -300,30 +343,75 @@ class InteractiveCube(plt.Axes):
         faces = self._project(self.cube._faces)[:, :, :2]
         face_centroids = self._project(self.cube._face_centroids[:, :3])
         sticker_centroids = self._project(self.cube._sticker_centroids[:, :3])
+        # max
+        text_centroids = self._project(self.cube._text_centroids[:, :3])
+        text_centroids_coords = text_centroids[:, :2]
 
         plastic_color = self.cube.plastic_color
         colors = np.asarray(self.cube.face_colors)[self.cube._colors]
         face_zorders = -face_centroids[:, 2]
         sticker_zorders = -sticker_centroids[:, 2]
+        # max
+        text_zorders = -text_centroids[:, 2]
+        text_letters = self.cube.text_letters
+
+        # annotation position could be calculated based on sticker centroids or quarternions (?)
+        # annotation direction could be calculated based on corresponding sticker or face coords or quarternions (?)
+        # (get vector for correct direction)
+        # does annotation get a zorder?
+
+        # should always be parallel to polygon lines...
 
         if self._face_polys is None:
             # initial call: create polygon objects and add to axes
             self._face_polys = []
             self._sticker_polys = []
+            self._text_annotations = []
 
+            #
             for i in range(len(colors)):
+                """
+                if i == 0:
+                    print("faces[i]: ", faces[i])
+                    print("face_zorders[i]: ", face_zorders[i])
+                    print("stickers[i]", stickers[i])
+                    print("sticker_zorders[i]", sticker_zorders[i])
+                    print("colors[i]", colors[i])
+                    print("face_centroids[i]", face_centroids[i])
+                    print("text_centroids[i]", text_centroids[i])
+                    print("text_zorders[i]", text_zorders[i])
+                    print("text_centroids_coords[i]", text_centroids_coords[i])
+                """
+
+
                 fp = plt.Polygon(faces[i], facecolor=plastic_color,
                                  zorder=face_zorders[i])
-                sp = plt.Polygon(stickers[i], facecolor=colors[i],
-                                 zorder=sticker_zorders[i])
+                sp = plt.Polygon(stickers[i], facecolor=colors[i], zorder=sticker_zorders[i])
 
+                # max
+                ta = self.annotate(xy=text_centroids_coords[i], text=text_letters[i], ha="center", va="center", rotation=0, size=15,
+                               zorder=text_zorders[i])
+                ta.internal_id = i
+
+                # print(stickers[i])
                 self._face_polys.append(fp)
                 self._sticker_polys.append(sp)
+                self._text_annotations.append(ta)
                 self.add_patch(fp)
                 self.add_patch(sp)
         else:
             # subsequent call: update the polygon objects
             for i in range(len(colors)):
+
+                if face_zorders[i] < 0:
+                    self._text_annotations[i].visible = False
+                    self._face_polys[i].visible = False
+                    self._sticker_polys[i].visible = False
+                else:
+                    self._text_annotations[i].visible = True
+                    self._face_polys[i].visible = True
+                    self._sticker_polys[i].visible = True
+
                 self._face_polys[i].set_xy(faces[i])
                 self._face_polys[i].set_zorder(face_zorders[i])
                 self._face_polys[i].set_facecolor(plastic_color)
@@ -332,11 +420,17 @@ class InteractiveCube(plt.Axes):
                 self._sticker_polys[i].set_zorder(sticker_zorders[i])
                 self._sticker_polys[i].set_facecolor(colors[i])
 
+                # max modify annotation position
+                self._text_annotations[i].set_x(text_centroids_coords[i][0])
+                self._text_annotations[i].set_y(text_centroids_coords[i][1])
+                self._text_annotations[i].set_zorder(text_zorders[i])
+
         self.figure.canvas.draw()
 
     def rotate(self, rot):
         self._current_rot = self._current_rot * rot
 
+    # changed steps=3 from steps=5 to make animation work
     def rotate_face(self, face, turns=1, layer=0, steps=5):
         if not np.allclose(turns, 0):
             for i in range(steps):
@@ -388,13 +482,23 @@ class InteractiveCube(plt.Axes):
             else:
                 direction = 1
 
+            # max
+            dir_word = "cw" if direction == 1 else "ccw"
+
             if np.any(self._digit_flags[:N]):
                 for d in np.arange(N)[self._digit_flags[:N]]:
                     self.rotate_face(event.key.upper(), direction, layer=d)
+                    # max
+                    self.cube.wc.make_move(face=event.key.upper(), layer=d, direction=dir_word)
             else:
                 self.rotate_face(event.key.upper(), direction)
-                
+                # max
+                self.cube.wc.make_move(face=event.key.upper(), direction=dir_word, layer=0)
+
+        print(self.cube.wc)
+
         self._draw_cube()
+
 
     def _key_release(self, event):
         """Handler for key release event"""
@@ -456,17 +560,27 @@ if __name__ == '__main__':
         N = 3
 
     c = Cube(N)
-
+    """
     # do a 3-corner swap
-    #c.rotate_face('R')
-    #c.rotate_face('D')
-    #c.rotate_face('R', -1)
-    #c.rotate_face('U', -1)
-    #c.rotate_face('R')
-    #c.rotate_face('D', -1)
-    #c.rotate_face('R', -1)
-    #c.rotate_face('U')
+    c.rotate_face('R')
+    c.rotate_face('D')
+    c.rotate_face('R', -1)
+    c.rotate_face('U', -1)
+    c.rotate_face('R')
+    c.rotate_face('D', -1)
+    c.rotate_face('R', -1)
+    c.rotate_face('U')
+    """
+    fig = c.draw_interactive()
 
-    c.draw_interactive()
+    cube_iteractive = [ax for ax in fig.get_axes() if type(ax) == InteractiveCube][0]
+
+    print(cube_iteractive.cube.wc)
+
+    """
+    for ta in cube_iteractive._text_annotations:
+        print(ta.internal_id, ta)
+    """
 
     plt.show()
+
