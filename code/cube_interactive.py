@@ -109,7 +109,7 @@ class Cube:
 
         self._move_list = []
         # max
-        self.wc = WordCube(shuffle=False)
+        self.wc = WordCube()
         self._initialize_arrays()
 
     def _initialize_arrays(self):
@@ -136,7 +136,7 @@ class Cube:
         sort_idx = np.argsort(tmp_inds)
         tmp_cfg = self.wc.config.flatten()[sort_idx]
 
-        self.text_letters = [letter.get_s()+str(letter.get_lid()) for letter in tmp_cfg]
+        self.text_letters = [str(letter) for letter in tmp_cfg]
 
         colors = []
 
@@ -323,6 +323,7 @@ class InteractiveCube(plt.Axes):
                          "U/D/L/R/B/F keys turn faces\n"
                          "(hold shift for counter-clockwise)",
                          size=10)
+        self.stickers_to_color_old = []
 
         # self.annotate("TEST",  xy=(.5, .5))
 
@@ -402,16 +403,6 @@ class InteractiveCube(plt.Axes):
         else:
             # subsequent call: update the polygon objects
             for i in range(len(colors)):
-
-                if face_zorders[i] < 0:
-                    self._text_annotations[i].visible = False
-                    self._face_polys[i].visible = False
-                    self._sticker_polys[i].visible = False
-                else:
-                    self._text_annotations[i].visible = True
-                    self._face_polys[i].visible = True
-                    self._sticker_polys[i].visible = True
-
                 self._face_polys[i].set_xy(faces[i])
                 self._face_polys[i].set_zorder(face_zorders[i])
                 self._face_polys[i].set_facecolor(plastic_color)
@@ -452,6 +443,7 @@ class InteractiveCube(plt.Axes):
 
     def _key_press(self, event):
         """Handler for key press events"""
+        stickers_to_color = list()
         if event.key == 'shift':
             self._shift = True
         elif event.key.isdigit():
@@ -490,12 +482,19 @@ class InteractiveCube(plt.Axes):
                     self.rotate_face(event.key.upper(), direction, layer=d)
                     # max
                     self.cube.wc.make_move(face=event.key.upper(), layer=d, direction=dir_word)
+                    stickers_to_color = self.cube.wc.check_cube()
             else:
                 self.rotate_face(event.key.upper(), direction)
                 # max
                 self.cube.wc.make_move(face=event.key.upper(), direction=dir_word, layer=0)
+                stickers_to_color = self.cube.wc.check_cube()
 
         print(self.cube.wc)
+        if len(self.stickers_to_color_old) > 0:
+            for i in self.stickers_to_color_old:
+                self._text_annotations[i].set_color("w")
+        for i in stickers_to_color:
+            self._text_annotations[i].set_color("r")
 
         self._draw_cube()
 
