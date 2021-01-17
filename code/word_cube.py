@@ -1,0 +1,320 @@
+import numpy as np
+import copy
+from datetime import datetime as dt
+
+
+class InvalidMoveException(Exception):
+    pass
+
+
+class WordCube:
+    """This class provides a representation of a 4x4 cube with letters on it
+    """
+
+    # initial positions of letters in the magic cube array
+    LID_INITIALISATION = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 35, 39, 43, 47, 34, 38, 42,
+                          46, 33, 37, 41, 45, 32, 36, 40, 44, 95, 91, 87, 83, 94, 90, 86, 82, 93, 89, 85, 81,
+                          92, 88, 84, 80, 63, 59, 55, 51, 62, 58, 54, 50, 61, 57, 53, 49, 60, 56, 52, 48, 75,
+                          74, 73, 79, 72, 71, 70, 78, 69, 68, 67, 77, 66, 65, 64, 76, 28, 29, 30, 31, 24, 25,
+                          26, 27, 20, 21, 22, 23, 16, 17, 18, 19]
+
+
+    def __init__(self, config=None, alphabet=None, shuffle=True):
+
+        self.LANGUAGES = ["de", "en", "es", "eu"]
+        self.FACES = ["U", "L", "F", "R", "B", "D"]
+        # adjacent faces are defined when looking at the face, so that the first of the adjacent faces in the list is
+        # at the '12-o'clock' position
+        self.ADJ_FACES = {
+            "U": ("B", "R", "F", "L"),
+            "L": ("U", "F", "D", "B"),
+            "R": ("U", "B", "D", "F"),
+            "F": ("U", "R", "D", "L"),
+            "B": ("U", "L", "D", "R"),
+            "D": ("F", "R", "B", "L")
+        }
+
+        language = ""
+        # alphabet - symbol: (num, cost) alphabet must be language dependent
+        # english scrabble (without blanks and without Q and X)
+        if alphabet is None:
+            self.alphabet = {
+                "E": (12, 1),
+                "A": (9, 1),
+                "I": (9, 1),
+                "O": (8, 1),
+                "N": (6, 1),
+                "R": (6, 1),
+                "T": (6, 1),
+                "L": (4, 1),
+                "S": (4, 1),
+                "U": (4, 1),
+                "D": (4, 2),
+                "G": (3, 2),
+                "B": (2, 3),
+                "C": (2, 3),
+                "M": (2, 3),
+                "P": (2, 3),
+                "F": (2, 4),
+                "H": (2, 4),
+                "V": (2, 4),
+                "W": (2, 4),
+                "Y": (2, 4),
+                "K": (1, 5),
+                "J": (1, 8),
+                "Z": (1, 10)
+            }
+        else:
+            self.alphabet = alphabet
+
+        if config is None:
+            self.config = np.asarray([Letter(k) for k, v in self.alphabet.items() for i in range(v[0])])
+        else:
+            self.config = config
+
+        if shuffle:
+            np.random.shuffle(self.config)
+
+        # add lids to the letters for finding the labels in the cube_interactive
+        for i, letter in enumerate(self.config):
+            letter.set_lid(self.LID_INITIALISATION[i])
+
+        # cube is represented by 6 faces with letters in a 4x4 square
+        self.config = self.config.reshape((6, 4, 4))
+
+        """
+        self.config = self.config[(0, 2, 5, 3, 4, 1), :, :]
+        self.config[1] = np.rot90(self.config[1])
+        self.config[2] = np.flip(np.transpose(self.config[2]))
+        self.config[3] = np.flip(np.transpose(self.config[3]))
+        self.config[4] = np.rot90(self.config[4])
+        indx = [2,6,10,3,14,1,5,7,9,13,0,11,4,8,12,15]
+        self.config[4] = self.config[4].flatten()[indx].reshape((4,4))
+        self.config[5] = np.flip(np.flip(self.config[5]), axis=1)
+
+        translation = [l.get_lid() for l in self.config.flatten()]
+
+        print(translation)
+        """
+
+        checker = None  # att fst object?
+
+    def make_move(self, face, layer, direction="cw"):
+        try:
+            assert (0 <= layer <= 3)
+            assert (face in self.FACES)
+            assert (direction == "cw" or direction == "ccw")
+        except AssertionError:
+            raise InvalidMoveException()
+
+        face_idx = self.FACES.index(face)
+        back_face = list(set(self.FACES) - set(self.ADJ_FACES[face]) - set(face))[0]
+
+        # translate move into same move from the opposite side, if one of the 3 sides is chosen
+        # this makes it necessary only to implement half of all possible moves, as you can mirror any move to the
+        # opposite side
+        if face in ["R", "B", "D"]:
+            # print("original move:", face, layer, direction)
+            self.make_move(back_face, 3 - layer, "ccw" if (direction == "cw") else "cw")
+            return
+
+        # rotate the  opposite face in the opposite direction
+        if layer == 3:
+            # get the face on the other side
+            back_face_idx = self.FACES.index(back_face)
+            # define rotation in the opposite direction
+            # 1 is counter-clock-wise, 3 is clockwise
+            rot_times = 1 if direction == "cw" else 3
+            self.config[back_face_idx] = np.rot90(self.config[back_face_idx], rot_times)
+
+        if layer == 0:
+            # in case the outer most layer is rotated we have to manipulate 5 faces
+            # get the face which needs to be rotated
+            rot_times = 3 if direction == "cw" else 1
+            self.config[face_idx] = np.rot90(self.config[face_idx], rot_times)
+
+        # print("Move:", face, layer, direction)
+
+        # exchange adjacent faces
+        if face == "U":
+            # top row of B
+            if direction == "cw":
+                tmp = copy.deepcopy(self.config[4, layer, :])
+                self.config[4, layer, :] = self.config[1, layer, :]
+                self.config[1, layer, :] = self.config[2, layer, :]
+                self.config[2, layer, :] = self.config[3, layer, :]
+                self.config[3, layer, :] = tmp
+            else:
+                tmp = copy.deepcopy(self.config[4, layer, :])
+                self.config[4, layer, :] = self.config[3, layer, :]
+                self.config[3, layer, :] = self.config[2, layer, :]
+                self.config[2, layer, :] = self.config[1, layer, :]
+                self.config[1, layer, :] = tmp
+        elif face == "L":
+            if direction == "cw":
+                tmp = copy.deepcopy(self.config[0, :, layer])
+                self.config[0, :, layer] = np.flip(self.config[4, :, 3 - layer])
+                self.config[4, :, 3 - layer] = np.flip(self.config[5, :, layer])
+                self.config[5, :, layer] = self.config[2, :, layer]
+                self.config[2, :, layer] = tmp
+            else:
+                tmp = copy.deepcopy(self.config[0, :, layer])
+                self.config[0, :, layer] = self.config[2, :, layer]
+                self.config[2, :, layer] = self.config[5, :, layer]
+                self.config[5, :, layer] = np.flip(self.config[4, :, 3 - layer])
+                self.config[4, :, 3 - layer] = np.flip(tmp)
+        elif face == "F":
+            if direction == "cw":
+                tmp = copy.deepcopy(self.config[0, 3 - layer, :])
+                self.config[0, 3 - layer, :] = np.flip(self.config[1, :, 3 - layer])
+                self.config[1, :, 3 - layer] = self.config[5, layer, :]
+                self.config[5, layer, :] = np.flip(self.config[3, :, layer])
+                self.config[3, :, layer] = tmp
+            else:
+                tmp = copy.deepcopy(self.config[0, 3 - layer, :])
+                self.config[0, 3 - layer, :] = self.config[3, :, layer]
+                self.config[3, :, layer] = np.flip(self.config[5, layer, :])
+                self.config[5, layer, :] = self.config[1, :, 3 - layer]
+                self.config[1, :, 3 - layer] = np.flip(tmp)
+
+    def get_strings(self, check_face):
+        horizontal = None
+        vertical = None
+
+        if check_face in ["L", "F", "R", "B"]:
+            horizontal = np.array([np.concatenate(self.config[1:5, i, :]) for i in range(self.config.shape[1])])
+        if check_face == "U":
+            pass
+        if check_face == "D":
+            pass
+
+        if check_face in ["U", "F", "D", "B"]:
+            vertical = np.array(
+                [np.concatenate([np.concatenate(self.config[[0, 2, 5], :, i]), self.config[4, ::-1, ::-1][i]]) for i in
+                 range(self.config.shape[2])])
+            if check_face == "B":
+                vertical = np.array([np.flip(arr) for arr in vertical[::-1]])
+        if check_face == "L":
+            pass
+        if check_face == "R":
+            pass
+
+        return horizontal, vertical
+
+    def __str__(self):
+        spacing = "\t\t\t"
+
+        ret = spacing
+
+        for r in self.config[0]:
+            for c in r:
+                ret += "|{}".format(c)
+            ret += "|\n" + spacing
+        ret += "\n"
+
+        for i in range(self.config.shape[1]):
+            for j, r in enumerate(self.config[1:-1, i, :]):
+                for c in r:
+                    ret += "|{}".format(c)
+                if j % 4 != 3:
+                    ret += "|\t"
+            ret += "|\n"
+        ret += "\n" + spacing
+
+        for r in self.config[-1]:
+            for c in r:
+                ret += "|{}".format(c)
+            ret += "|\n" + spacing
+
+        return ret
+
+
+class Letter:
+    def __init__(self, s, lid=None):
+        self.s = s
+        self.lid = lid
+
+    def lower(self):
+        return self.s.lower()
+
+    def upper(self):
+        return self.s.upper()
+
+    def get_lid(self):
+        return self.lid
+
+    def get_s(self):
+        return self.s
+
+    def set_lid(self, lid):
+        self.lid = lid
+
+    def set_s(self, s):
+        self.s = s
+
+    def __str__(self):
+        return self.s + str(self.lid)
+
+    def __eq__(self, other):
+        try:
+            assert type(other) == Letter
+            assert other.s == self.s
+            return True
+        except AssertionError:
+            return False
+
+
+if __name__ == "__main__":
+    wc = WordCube(shuffle=False)
+
+    print(wc)
+    """
+    config = np.asarray([[['P', 'E', 'L', 'E'],
+        ['T', 'R', 'A', 'B'],
+        ['I', 'I', 'Z', 'N'],
+        ['G', 'B', 'W', 'O']],
+        [['P', 'S', 'S', 'S'],
+        ['T', 'R', 'I', 'I'],
+        ['C', 'S', 'O', 'A'],
+        ['Y', 'A', 'E', 'M']],
+        [['P', 'E', 'L', 'E'],
+        ['I', 'W', 'D', 'R'],
+        ['I', 'A', 'E', 'S'],
+        ['L', 'U', 'K', 'N']],
+        [['N', 'T', 'I', 'S'],
+        ['O', 'C', 'E', 'E'],
+        ['H', 'L', 'E', 'F'],
+        ['N', 'T', 'V', 'P']],
+        [['A', 'E', 'F', 'O'],
+        ['O', 'T', 'V', 'H'],
+        ['L', 'G', 'O', 'I'],
+        ['U', 'O', 'N', 'S']],
+        [['J', 'N', 'D', 'E'],
+        ['N', 'D', 'E', 'D'],
+        ['R', 'E', 'E', 'U'],
+        ['I', 'R', 'M', 'O']]], dtype=object)
+
+    wc = WordCube(config=config, shuffle=False)
+
+    print(wc)
+
+    h, v = wc.get_strings(check_face="F")
+
+    start = dt.now()
+    cc = cube_checker.CubeChecker("att_files/zapChecker.att", wc.alphabet)
+
+
+    res = list()
+    for word in h:
+        word = "".join(word)
+        word = word[1:] + word + word[:-1]
+        res.append(cc.check_string(word))
+    for word in v:
+        word = "".join(word)
+        word = word[1:] + word + word[:-1]
+        res.append(cc.check_string(word))
+
+    print(res)
+
+    print(dt.now()-start)
+    """
