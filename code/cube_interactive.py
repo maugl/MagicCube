@@ -492,9 +492,10 @@ class InteractiveCube(plt.Axes):
         print(self.cube.wc)
         if len(self.stickers_to_color_old) > 0:
             for i in self.stickers_to_color_old:
-                self._text_annotations[i].set_color("w")
+                self._text_annotations[i].set_color("black")
         for i in stickers_to_color:
             self._text_annotations[i].set_color("r")
+        self.stickers_to_color_old = stickers_to_color
 
         self._draw_cube()
 
