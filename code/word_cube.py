@@ -33,7 +33,7 @@ class WordCube:
         "D": ("F", "R", "B", "L")
     }
 
-    def __init__(self, config=None, alphabet=None, language="es",shuffle=True, seed=42):
+    def __init__(self, config=None, alphabet=None, language="es", shuffle=True, seed=42):
         assert(language in self.LANGUAGES)
         self.language = language
 
@@ -215,7 +215,7 @@ class WordCube:
 
         if check_face in ["U", "F", "D", "B"]:
             vertical = np.array(
-                [np.concatenate([np.concatenate(self.config[[0, 2, 5], :, i]), self.config[4, ::-1, i]]) for i in
+                [np.concatenate([np.concatenate(self.config[[0, 2, 5], :, i]), self.config[4, ::-1, 3-i]]) for i in
                  range(self.config.shape[2])])
             if check_face == "B":
                 vertical = np.array([np.flip(arr) for arr in vertical[::-1]])

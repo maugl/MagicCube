@@ -6,7 +6,7 @@ class CubeChecker:
     def __init__(self, language, alphabet):
 
         self.language_lookup = {
-            "es": "../att_files/esChecker.att"
+            "es": "esChecker.att"
         }
 
         self.transducer = attapply.ATTFST(self.language_lookup[language])

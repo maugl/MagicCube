@@ -109,7 +109,7 @@ class Cube:
 
         self._move_list = []
         # max
-        self.wc = WordCube()
+        self.wc = WordCube(shuffle=True, seed=None)
         self._initialize_arrays()
 
     def _initialize_arrays(self):
