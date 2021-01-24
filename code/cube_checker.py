@@ -3,12 +3,17 @@ import word_cube
 
 
 class CubeChecker:
-    def __init__(self, checkerFile, alphabet):
-        self.transducer = attapply.ATTFST(checkerFile)
+    def __init__(self, language, alphabet):
+
+        self.language_lookup = {
+            "es": "../att_files/esChecker.att"
+        }
+
+        self.transducer = attapply.ATTFST(self.language_lookup[language])
         self.alphabet = {k:v[1] for k,v in alphabet.items()}
 
     def check_string(self, input_string):
-        check_string = input_string[1:] + input_string + input_string[:-1]
+        check_string = input_string
         words = list(self.transducer.apply(word=check_string.lower(), dir="down"))
         return self.weight_words(words)
 
@@ -24,6 +29,5 @@ class CubeChecker:
 
 if __name__ == "__main__":
     wc = word_cube.WordCube()
-    cc = CubeChecker("att_files/zapChecker.att", wc.alphabet)
 
-    print(cc.check_string("asdklblaspelensblasdasd"))
+    print(wc.checker.check_string("sdklajdojosalsdjkla"))

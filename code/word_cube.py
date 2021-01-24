@@ -33,14 +33,41 @@ class WordCube:
         "D": ("F", "R", "B", "L")
     }
 
-    def __init__(self, config=None, alphabet=None, language="en",shuffle=True, seed=42):
+    def __init__(self, config=None, alphabet=None, language="es",shuffle=True, seed=42):
         assert(language in self.LANGUAGES)
         self.language = language
 
-        # alphabet - symbol: (num, cost) alphabet must be language dependent
-        # english scrabble (without blanks and without Q and X)
-        if alphabet is None:
-            self.alphabet = {
+        alphabet_es = {
+                "E": (12, 1),
+                "A": (11, 1),
+                "I": (6, 1),
+                "O": (9, 1),
+                "N": (5, 1),
+                "R": (5, 1),
+                "T": (4, 1),
+                "L": (4, 1),
+                "S": (6, 1),
+                "U": (5, 1),
+                "D": (5, 2),
+                "G": (2, 2),
+                "B": (2, 3),
+                "C": (4, 3),
+                "M": (2, 3),
+                "P": (2, 3),
+                "F": (1, 4),
+                "H": (2, 4),
+                "V": (1, 4),
+                "Y": (1, 4),
+                "CH": (1, 5),
+                "J": (1, 8),
+                "LL": (1, 8),
+                "Ñ": (1, 8),
+                "RR": (1, 8),
+                "X": (1, 8),
+                "Z": (1, 10)
+            }
+
+        alphabet_en = {
                 "E": (12, 1),
                 "A": (9, 1),
                 "I": (9, 1),
@@ -65,9 +92,17 @@ class WordCube:
                 "K": (1, 5),
                 "J": (1, 8),
                 "Z": (1, 10)
-            }
-        else:
-            self.alphabet = alphabet
+        }
+
+        self.alphabet_lookup = {
+            "es": alphabet_es,
+            "en": alphabet_en
+        }
+
+        # alphabet - symbol: (num, cost) alphabet must be language dependent
+        # english scrabble (without blanks and without Q and X)
+        if alphabet is None:
+            self.alphabet = self.alphabet_lookup[language]
 
         if config is None:
             self.config = np.asarray([Letter(k) for k, v in self.alphabet.items() for i in range(v[0])])
@@ -86,8 +121,8 @@ class WordCube:
         self.config = self.config.reshape((6, 4, 4))
 
         # add ability to check for words on the cube depending on the language
-        self.att_file_name = "../att_files/zapChecker.att"
-        self.checker = CubeChecker(self.att_file_name, self.alphabet) # att fst object?
+
+        self.checker = CubeChecker(self.language, self.alphabet) # att fst object?
 
     def make_move(self, face, layer, direction="cw"):
         try:
@@ -180,7 +215,7 @@ class WordCube:
 
         if check_face in ["U", "F", "D", "B"]:
             vertical = np.array(
-                [np.concatenate([np.concatenate(self.config[[0, 2, 5], :, i]), self.config[4, ::-1, ::-1][i]]) for i in
+                [np.concatenate([np.concatenate(self.config[[0, 2, 5], :, i]), self.config[4, ::-1, i]]) for i in
                  range(self.config.shape[2])])
             if check_face == "B":
                 vertical = np.array([np.flip(arr) for arr in vertical[::-1]])
@@ -194,19 +229,21 @@ class WordCube:
     def check_cube(self):
         lines = self.get_strings("F")
 
-        print(lines.shape)
+        for line in lines:
+            print("".join([l.get_s() for l in line]))
 
         strings = ["".join([letter.get_s() for letter in line]) for line in lines]
         ids = [[letter.get_lid() for letter in line] for line in lines]
 
-        print(strings)
-        print(ids)
+        # print(strings)
+        # print(ids)
 
         found_strings = list()
         for i, s in enumerate(strings):
             found_strings.append((self.checker.check_string(s), i))
 
-        print(found_strings)
+        # print(found_strings)
+        # print(found_strings)
 
         top_match = ((-1,""),-1)
         for matches in found_strings:
@@ -214,18 +251,25 @@ class WordCube:
             if len(matches) == 0:
                 continue
             for match in matches[0]:
-                print(match)
+                # print(match)
                 if top_match is not None and top_match[0][0] >= match[0]:
                         continue
                 # make sure the word fits on the cube
-                elif len(match[1]) <= 16:
+                elif len(match[1]) <= 16 and len(match[1]) > 3:
                     top_match = (match, i)
-
         # find identified sequence in the cube
         # make sure the match is no longer than 16 characters
-        # make sure to know where the match starts and ends, especially tricky when wrapping around
-        start_idx = strings[top_match[1]].find(top_match[0][1].upper())
-        cube_idxs = ids[top_match[1]][start_idx:start_idx+len(top_match[0][1])]
+        # make sure to know where the match starts and ends
+        print("top word", top_match[0][1])
+        start_idx = (strings[top_match[1]]).find(top_match[0][1].upper())
+        # calculate the actual length for words on the cube in terms of letters (some letters have multiple characters)
+        letters = lines[top_match[1]][start_idx:start_idx+len(top_match[0][1])]
+        letters_len = sum([len(l.get_s()) for l in letters])
+        word_len_on_cube = len(letters) - np.abs(letters_len - len(top_match[0][1]))
+
+        print(word_len_on_cube)
+
+        cube_idxs = ids[top_match[1]][start_idx:start_idx+word_len_on_cube]
 
         return cube_idxs
 

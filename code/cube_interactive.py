@@ -371,20 +371,6 @@ class InteractiveCube(plt.Axes):
 
             #
             for i in range(len(colors)):
-                """
-                if i == 0:
-                    print("faces[i]: ", faces[i])
-                    print("face_zorders[i]: ", face_zorders[i])
-                    print("stickers[i]", stickers[i])
-                    print("sticker_zorders[i]", sticker_zorders[i])
-                    print("colors[i]", colors[i])
-                    print("face_centroids[i]", face_centroids[i])
-                    print("text_centroids[i]", text_centroids[i])
-                    print("text_zorders[i]", text_zorders[i])
-                    print("text_centroids_coords[i]", text_centroids_coords[i])
-                """
-
-
                 fp = plt.Polygon(faces[i], facecolor=plastic_color,
                                  zorder=face_zorders[i])
                 sp = plt.Polygon(stickers[i], facecolor=colors[i], zorder=sticker_zorders[i])
@@ -489,13 +475,14 @@ class InteractiveCube(plt.Axes):
                 self.cube.wc.make_move(face=event.key.upper(), direction=dir_word, layer=0)
                 stickers_to_color = self.cube.wc.check_cube()
 
-        print(self.cube.wc)
-        if len(self.stickers_to_color_old) > 0:
-            for i in self.stickers_to_color_old:
-                self._text_annotations[i].set_color("black")
-        for i in stickers_to_color:
-            self._text_annotations[i].set_color("r")
-        self.stickers_to_color_old = stickers_to_color
+            print(self.cube.wc)
+            print(stickers_to_color)
+            if len(self.stickers_to_color_old) > 0:
+                for i in self.stickers_to_color_old:
+                    self._text_annotations[i].set_color("black")
+            for i in stickers_to_color:
+                self._text_annotations[i].set_color("r")
+            self.stickers_to_color_old = stickers_to_color
 
         self._draw_cube()
 
@@ -557,7 +544,7 @@ if __name__ == '__main__':
     try:
         N = int(sys.argv[1])
     except:
-        N = 3
+        N = 4
 
     c = Cube(N)
     """
